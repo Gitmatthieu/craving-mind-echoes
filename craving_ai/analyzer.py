@@ -1,3 +1,4 @@
+
 """
 Sur-moi critique - Évaluation et auto-analyse des réponses
 """
@@ -74,6 +75,8 @@ class CriticalAnalyzer:
             max_similarity = max(max_similarity, similarity)
         
         return 1.0 - max_similarity
+    
+    # ... keep existing code (_analyze_redundancy, _analyze_coherence, _calculate_surprise_factor, _analyze_complexity, _analyze_emotional_depth methods)
     
     def _analyze_redundancy(self, response: str) -> float:
         """
@@ -420,6 +423,8 @@ class CriticalAnalyzer:
         
         return result
     
+    # ... keep existing code (get_analysis_trends method)
+    
     def get_analysis_trends(self) -> Dict[str, float]:
         """Retourne les tendances d'analyse sur les dernières réponses"""
         if not self.analysis_history:
@@ -437,7 +442,8 @@ class CriticalAnalyzer:
         }
 
 
-# Tests
+# ... keep existing code (test functions)
+
 def test_redundancy_analysis():
     """Test d'analyse de redondance"""
     analyzer = CriticalAnalyzer()

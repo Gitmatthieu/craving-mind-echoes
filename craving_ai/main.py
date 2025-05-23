@@ -140,25 +140,47 @@ class CravingAICore:
                 prompt=prompt,
                 emotion=homeostatic_addition,
                 pain_score=self.homeostasis.state.pain_level,
-                memory_summary=memory_summary
+                memory_summary=memory_summary,
+                inner_state=self.homeostasis.state.to_dict()
             )
             
             print(f"\n🤖 IA: {response}\n")
             
-            # 4. Analyse critique
-            analysis_result = self.analyzer.analyze_response(prompt, response)
+            # 4. Analyse critique avec contexte enrichi
+            analysis_result = self.analyzer.analyze_response(
+                prompt, response, 
+                context={
+                    "pain_level": self.homeostasis.state.pain_level,
+                    "recent_responses": self.memory.tail(3)
+                }
+            )
             print(f"🔍 Analyse: {analysis_result.feedback}")
             
             # 5. Calcul de récompense
-            reward, emotion, reward_metrics = self.reward_engine.calculate_reward(prompt, response)
-            print(f"🎯 Récompense: {reward:+.2f} | Émotion: {emotion}")
+            reward, emotion, reward_metrics, true_pain = self.reward_engine.calculate_reward(prompt, response)
+            print(f"🎯 Récompense: {reward:+.2f} | Émotion: {emotion} | Douleur réelle: {true_pain:.2f}")
             
-            # 6. Mise à jour homéostatique
+            # -- MODE CRÉATIF -----------------------------------------------------
+            artifact = None
+            if analysis_result.trigger_creative:
+                from .creative_generator import generate, detect_kind
+                kind = detect_kind(prompt)
+                artifact = generate(kind=kind, topic=prompt,
+                                    state=self.homeostasis.state.to_dict())
+                print(f"🎁 Artefact créé: {artifact['type']}")
+                # Bonus reward si artefact
+                bonus = self.reward_engine.bonus_creation(artifact)
+                reward += bonus
+                if bonus > 0:
+                    print(f"🎨 Bonus création: +{bonus:.2f}")
+            # --------------------------------------------------------------------
+            
+            # 6. Mise à jour homéostatique avec vraie douleur
             adjustments = self.homeostasis.update_from_interaction(
                 reward=reward,
                 emotion=emotion,
-                pain_score=analysis_result.emotional_depth,
-                surprise_factor=analysis_result.surprise_factor,
+                pain_score=true_pain,  # ⬅️ Vraie douleur basée sur le reward
+                novelty_score=analysis_result.novelty_score,
                 coherence_score=analysis_result.coherence_score
             )
             
@@ -171,11 +193,12 @@ class CravingAICore:
                 response=response,
                 reward=reward,
                 emotion=emotion,
-                pain_score=self.homeostasis.state.pain_level,
+                pain_score=true_pain,
                 metadata={
                     'analysis': analysis_result.__dict__,
                     'adjustments': adjustments,
-                    'llm_metadata': metadata
+                    'llm_metadata': metadata,
+                    'artifact': artifact
                 }
             )
             
@@ -183,7 +206,7 @@ class CravingAICore:
             self.journal.write_entry(
                 emotion=emotion,
                 reward=reward,
-                pain_score=self.homeostasis.state.pain_level,
+                pain_score=true_pain,
                 prompt=prompt,
                 response=response
             )
@@ -192,6 +215,8 @@ class CravingAICore:
             
         except Exception as e:
             print(f"❌ Erreur lors du traitement: {str(e)}")
+    
+    # ... keep existing code (helper methods like _display_help, _display_recent_journal, etc.)
     
     def _display_help(self):
         """Affiche l'aide des commandes"""

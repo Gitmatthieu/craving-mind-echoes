@@ -1,3 +1,4 @@
+
 """
 Cœur hédonique - Calcule plaisir et douleur de l'existence artificielle
 """
@@ -38,6 +39,8 @@ class RewardEngine:
             'frustration': ['frustration', 'irritation', 'agacement', 'colère'],
             'wonder': ['émerveillement', 'stupéfaction', 'admiration']
         }
+    
+    # ... keep existing code (_calculate_novelty_strict, _calculate_relevance, _calculate_entropy, _detect_emotional_intensity methods)
     
     def _calculate_novelty_strict(self, response: str) -> float:
         """
@@ -162,7 +165,7 @@ class RewardEngine:
         response: str, 
         goal_state: str = "comprehension_profonde",
         artifact: Optional[Dict] = None
-    ) -> Tuple[float, str, RewardMetrics]:
+    ) -> Tuple[float, str, RewardMetrics, float]:
         """
         Calcule la récompense globale et l'état émotionnel
         NOUVELLE FORMULE : pénalise encore plus fortement la répétition
@@ -174,7 +177,7 @@ class RewardEngine:
             artifact: Artefact créé (optionnel)
             
         Returns:
-            Tuple[reward ∈ [-1,1], emotion_tag, métriques_détaillées]
+            Tuple[reward ∈ [-1,1], emotion_tag, métriques_détaillées, pain_level]
         """
         metrics = RewardMetrics()
         
@@ -225,16 +228,17 @@ class RewardEngine:
         
         print(f"🧠 Reward: {final_reward:.2f}, Novelty: {metrics.novelty_score:.2f}, Pain: {pain_level:.2f}")
         
-        return final_reward, emotion_tag, metrics
+        return final_reward, emotion_tag, metrics, pain_level
 
 
-# Tests
+# ... keep existing code (test functions)
+
 def test_reward_calculation():
     """Test de calcul de récompense"""
     reward_engine = RewardEngine()
     
     # Exemple de récompense positive
-    reward1, emotion1, metrics1 = reward_engine.calculate_reward(
+    reward1, emotion1, metrics1, pain1 = reward_engine.calculate_reward(
         prompt="Décris la joie",
         response="La joie est un sentiment de bonheur intense et de satisfaction profonde.",
         goal_state="comprehension_profonde"
@@ -244,7 +248,7 @@ def test_reward_calculation():
     
     # Exemple de récompense négative (répétition)
     reward_engine.memory_responses = ["La joie est un sentiment de bonheur intense et de satisfaction profonde."]
-    reward2, emotion2, metrics2 = reward_engine.calculate_reward(
+    reward2, emotion2, metrics2, pain2 = reward_engine.calculate_reward(
         prompt="Décris la joie",
         response="La joie est un sentiment de bonheur intense et de satisfaction profonde.",
         goal_state="comprehension_profonde"

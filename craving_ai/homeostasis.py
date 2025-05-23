@@ -1,3 +1,4 @@
+
 """
 Régulation homéostatique - Équilibrage automatique de l'état interne
 """
@@ -55,6 +56,8 @@ class HomeostaticRegulator:
         
         self._load_state()
     
+    # ... keep existing code (_load_state, _save_state methods)
+    
     def _load_state(self) -> None:
         """Charge l'état homéostatique depuis le fichier"""
         try:
@@ -103,6 +106,12 @@ class HomeostaticRegulator:
             'reward': reward,
             'emotion': emotion,
             'novelty': novelty_score
+        })
+        
+        # Enregistrement de la douleur dans l'historique
+        self.pain_history.append({
+            'timestamp': datetime.now().isoformat(),
+            'pain': pain_score
         })
         
         old_pain = self.state.pain_level
@@ -187,6 +196,8 @@ class HomeostaticRegulator:
         self._save_state()
         
         return adjustments
+    
+    # ... keep existing code (_adjust_llm_parameters, get_current_llm_config, get_system_prompt_addition, force_reset, get_diagnostic methods)
     
     def _adjust_llm_parameters(self) -> Dict[str, float]:
         """
@@ -298,7 +309,8 @@ class HomeostaticRegulator:
         }
 
 
-# Tests
+# ... keep existing code (test functions)
+
 def test_homeostatic_initialization():
     """Test d'initialisation du régulateur"""
     regulator = HomeostaticRegulator("test_homeostasis.json")
