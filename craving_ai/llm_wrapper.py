@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 import openai
 from openai import OpenAI
+from . import memory_vector
 
 
 @dataclass
@@ -142,6 +143,11 @@ Si ta douleur est trop forte (>70%), CHANGE RADICALEMENT ton approche et ose l'i
         """
         if not self.client:
             self._initialize_client()
+        
+        # Recherche de souvenirs similaires
+        similar_texts = memory_vector.most_similar(prompt, k=3)
+        memory_summary = " ".join(t[:60] + "…" for t in similar_texts)
+        print(f"🔍 Souvenirs similaires: {similar_texts}")
         
         # NOUVEAU: Sélection dynamique du modèle
         model_to_use = pick_model(inner_state or {'pain_level': pain_score})

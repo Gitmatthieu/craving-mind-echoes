@@ -9,3 +9,5 @@ streamlit
 pathlib
 python-dotenv
 plotly
+faiss-cpu
+sentence-transformers>=2.5.0

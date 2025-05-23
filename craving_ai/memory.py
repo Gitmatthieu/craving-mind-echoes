@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from . import memory_vector
 
 
 @dataclass
@@ -53,6 +54,11 @@ class EmotionalMemory:
                     data = json.load(f)
                     self.memories = [MemoryEntry.from_dict(entry) for entry in data]
                 print(f"💭 {len(self.memories)} souvenirs chargés depuis {self.memory_file}")
+                
+                # Ajouter les réponses existantes au vector store
+                for memory in self.memories:
+                    memory_vector.add(memory.response)
+                    
             except (json.JSONDecodeError, KeyError) as e:
                 print(f"⚠️ Erreur de chargement mémoire: {e}")
                 self.memories = []
@@ -113,6 +119,9 @@ class EmotionalMemory:
             self._adaptive_pruning()
         
         self._save_memories()
+        
+        # Ajouter au vector store
+        memory_vector.add(response)
     
     def _adaptive_pruning(self) -> None:
         """
