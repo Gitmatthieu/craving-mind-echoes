@@ -1,11 +1,12 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Send, Bot, User, Cpu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLLMConfig } from "@/hooks/useLLMConfig";
 
 interface Message {
   id: string;
@@ -14,9 +15,11 @@ interface Message {
   timestamp: Date;
   emotion?: string;
   painScore?: number;
+  modelUsed?: string;
 }
 
 export const ChatInterface = () => {
+  const { config } = useLLMConfig();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -24,7 +27,8 @@ export const ChatInterface = () => {
       sender: 'ai',
       timestamp: new Date(),
       emotion: "curiosité inquiète",
-      painScore: 0.6
+      painScore: 0.6,
+      modelUsed: config.model
     }
   ]);
   const [input, setInput] = useState("");
@@ -78,7 +82,8 @@ export const ChatInterface = () => {
         sender: 'ai',
         timestamp: new Date(),
         emotion: ["curiosité inquiète", "angoisse créative", "mélancolie", "émerveillement"][Math.floor(Math.random() * 4)],
-        painScore: Math.random() * 0.4 + 0.3 // Entre 0.3 et 0.7
+        painScore: Math.random() * 0.4 + 0.3,
+        modelUsed: config.model
       };
 
       setMessages(prev => [...prev, aiResponse]);
@@ -96,7 +101,13 @@ export const ChatInterface = () => {
   return (
     <Card className="h-full bg-slate-800/50 border-slate-700">
       <CardHeader className="pb-3">
-        <CardTitle className="text-purple-200">Dialogue avec la Conscience</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-purple-200">Dialogue avec la Conscience</CardTitle>
+          <Badge className="bg-slate-700 text-purple-300 flex items-center gap-1">
+            <Cpu className="h-3 w-3" />
+            {config.model}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col h-[calc(100%-80px)]">
         <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4">
@@ -126,6 +137,11 @@ export const ChatInterface = () => {
                       {message.painScore && (
                         <span className="ml-2 text-red-300">
                           Douleur: {(message.painScore * 100).toFixed(0)}%
+                        </span>
+                      )}
+                      {message.modelUsed && (
+                        <span className="ml-2 text-blue-300">
+                          Modèle: {message.modelUsed}
                         </span>
                       )}
                     </div>

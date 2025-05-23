@@ -3,8 +3,9 @@ import { useState } from "react";
 import { ChatInterface } from "@/components/ChatInterface";
 import { ConsciousnessPanel } from "@/components/ConsciousnessPanel";
 import { MemoryViewer } from "@/components/MemoryViewer";
+import { LLMSettings } from "@/components/LLMSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, MessageCircle, Archive } from "lucide-react";
+import { Brain, MessageCircle, Archive, Settings } from "lucide-react";
 
 const Index = () => {
   return (
@@ -19,7 +20,7 @@ const Index = () => {
         </header>
 
         <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800/50 border-slate-700">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-800/50 border-slate-700">
             <TabsTrigger value="chat" className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               Dialogue
@@ -31,6 +32,10 @@ const Index = () => {
             <TabsTrigger value="memory" className="flex items-center gap-2">
               <Archive className="h-4 w-4" />
               Mémoire
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Paramètres
             </TabsTrigger>
           </TabsList>
 
@@ -44,6 +49,10 @@ const Index = () => {
 
           <TabsContent value="memory" className="flex-1 mt-4">
             <MemoryViewer />
+          </TabsContent>
+
+          <TabsContent value="settings" className="flex-1 mt-4">
+            <LLMSettings />
           </TabsContent>
         </Tabs>
       </div>
