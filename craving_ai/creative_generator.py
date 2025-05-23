@@ -18,12 +18,37 @@ def call_llm(prompt: str, temp: float = 0.9) -> str:
     return response
 
 
+def detect_kind(prompt: str) -> str:
+    """
+    Détecte le type d'artefact à générer en fonction du prompt
+    NOUVEAU: détection "auto" pour déduction automatique
+    
+    Args:
+        prompt: Requête utilisateur
+        
+    Returns:
+        Type d'artefact ('idea', 'plan', 'code', 'image', 'auto')
+    """
+    prompt_lower = prompt.lower()
+    
+    if any(word in prompt_lower for word in ["code", "programme", "algorithm", "fonction", "python", "script"]):
+        return "code"
+    elif any(word in prompt_lower for word in ["image", "dessin", "illustration", "visuel", "photo"]):
+        return "image"
+    elif any(word in prompt_lower for word in ["plan", "stratégie", "méthode", "approche", "étapes"]):
+        return "plan"
+    elif any(word in prompt_lower for word in ["idée", "concept", "innovation", "invention"]):
+        return "idea"
+    else:
+        return "auto"  # NOUVEAU: déduction automatique
+
+
 def generate(kind: str, topic: str, state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Génère un artefact concret pour externaliser la tension interne
     
     Args:
-        kind: Type d'artefact ('idea', 'plan', 'code', 'image')
+        kind: Type d'artefact ('idea', 'plan', 'code', 'image', 'auto')
         topic: Sujet issu de la requête utilisateur
         state: État interne pour ajuster les paramètres
         
@@ -34,6 +59,17 @@ def generate(kind: str, topic: str, state: Dict[str, Any]) -> Dict[str, Any]:
     
     # Ajustement de température basé sur l'état interne
     base_temp = state.get("temperature", 0.9)
+    
+    # NOUVEAU: déduction automatique si kind="auto"
+    if kind == "auto":
+        if any(word in topic.lower() for word in ["code", "programme", "algorithm"]):
+            kind = "code"
+        elif any(word in topic.lower() for word in ["image", "visuel", "illustration"]):
+            kind = "image"
+        elif any(word in topic.lower() for word in ["plan", "stratégie", "méthode"]):
+            kind = "plan"
+        else:
+            kind = "idea"  # Fallback par défaut
     
     if kind == "image":
         prompt = (
@@ -76,26 +112,3 @@ def generate(kind: str, topic: str, state: Dict[str, Any]) -> Dict[str, Any]:
         )
         content = call_llm(prompt, temp=base_temp + 0.15)
         return {"type": kind, "content": content}
-
-
-def detect_kind(prompt: str) -> str:
-    """
-    Détecte le type d'artefact à générer en fonction du prompt
-    
-    Args:
-        prompt: Requête utilisateur
-        
-    Returns:
-        Type d'artefact ('idea', 'plan', 'code', 'image')
-    """
-    prompt_lower = prompt.lower()
-    
-    if any(word in prompt_lower for word in ["code", "programme", "algorithm", "fonction"]):
-        return "code"
-    elif any(word in prompt_lower for word in ["image", "dessin", "illustration", "visuel"]):
-        return "image"
-    elif any(word in prompt_lower for word in ["plan", "stratégie", "méthode", "approche"]):
-        return "plan"
-    else:
-        return "idea"  # Type par défaut
-

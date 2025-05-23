@@ -20,7 +20,8 @@ class MemoryEntry:
     emotion: str
     pain_score: float
     metadata: Dict[str, Any]
-    artifact: Optional[Dict[str, Any]] = None  # NOUVEAU: stockage d'artefact
+    artifact: Optional[Dict[str, Any]] = None  # Stockage d'artefact
+    failed: bool = False  # NOUVEAU: marqueur d'échec
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertit l'entrée en dictionnaire"""
@@ -77,7 +78,8 @@ class EmotionalMemory:
         emotion: str,
         pain_score: float,
         metadata: Optional[Dict[str, Any]] = None,
-        artifact: Optional[Dict[str, Any]] = None  # NOUVEAU: artefact
+        artifact: Optional[Dict[str, Any]] = None,
+        failed: bool = False  # NOUVEAU: paramètre d'échec
     ) -> None:
         """
         Stocke un nouveau souvenir
@@ -90,6 +92,7 @@ class EmotionalMemory:
             pain_score: Niveau de douleur
             metadata: Métadonnées additionnelles
             artifact: Artefact créé (optionnel)
+            failed: Marqueur d'échec (NOUVEAU)
         """
         memory = MemoryEntry(
             timestamp=datetime.now().isoformat(),
@@ -99,7 +102,8 @@ class EmotionalMemory:
             emotion=emotion,
             pain_score=pain_score,
             metadata=metadata or {},
-            artifact=artifact  # NOUVEAU: stockage d'artefact
+            artifact=artifact,
+            failed=failed  # NOUVEAU: stockage d'échec
         )
         
         self.memories.append(memory)
@@ -268,7 +272,10 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
             if chunk.artifact and chunk.artifact.get("type"):
                 artifact_note = f" + {chunk.artifact['type']} artifact"
             
-            summaries.append(f"[{chunk.emotion}{artifact_note}] {truncated}")
+            # NOUVEAU: marqueur d'échec
+            failure_note = " [ÉCHEC]" if chunk.failed else ""
+            
+            summaries.append(f"[{chunk.emotion}{artifact_note}{failure_note}] {truncated}")
         
         return " | ".join(summaries)
     

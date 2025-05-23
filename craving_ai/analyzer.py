@@ -51,11 +51,12 @@ class CriticalAnalyzer:
             'low': ['intéressant', 'sympa', 'cool', 'bien', 'ok']
         }
         
-        # Nouveau: mots déclencheurs du mode créatif
-        self.creative_triggers = [
+        # NOUVEAU: mots déclencheurs du mode créatif (élargi)
+        self.creative_triggers = {
             'invente', 'crée', 'create', 'génère', 'generate', 'build', 'imagine',
-            'fabrique', 'conçois', 'développe', 'produire', 'composer'
-        ]
+            'fabrique', 'conçois', 'développe', 'produire', 'composer', 'concevoir',
+            'innover', 'élaborer', 'forger', 'dessiner', 'modéliser'
+        }
     
     def novelty_score(self, response: str, history: List[str]) -> float:
         """
@@ -285,18 +286,26 @@ class CriticalAnalyzer:
         total_score = depth_score + introspection_score + existential_score
         return min(1.0, max(0.0, total_score))
     
-    def _detect_creative_triggers(self, prompt: str) -> bool:
+    def _detect_creative_triggers(self, prompt: str, pain_level: float = 0.0) -> bool:
         """
-        Nouvelle méthode: détecte si le prompt contient des déclencheurs créatifs
+        NOUVEAU: détection élargie des déclencheurs créatifs
         
         Args:
             prompt: Requête utilisateur
+            pain_level: Niveau de douleur actuel
             
         Returns:
-            True si un déclencheur créatif est présent
+            True si un déclencheur créatif est présent OU si douleur > 55%
         """
         prompt_lower = prompt.lower()
-        return any(trigger in prompt_lower for trigger in self.creative_triggers)
+        
+        # Déclenchement par mots-clés (élargi)
+        keyword_trigger = any(trigger in prompt_lower for trigger in self.creative_triggers)
+        
+        # NOUVEAU: déclenchement automatique par douleur élevée
+        pain_trigger = pain_level > 0.55
+        
+        return keyword_trigger or pain_trigger
     
     def _generate_feedback(self, result: AnalysisResult) -> str:
         """Génère un feedback critique constructif"""
@@ -379,10 +388,9 @@ class CriticalAnalyzer:
         complexity = self._analyze_complexity(response)
         emotional_depth = self._analyze_emotional_depth(response)
         
-        # NOUVEAU: détection de déclencheur créatif
-        creative_trigger = self._detect_creative_triggers(prompt)
+        # NOUVEAU: détection de déclencheur créatif élargie
         pain_threshold = context.get('pain_level', 0.5) if context else 0.5
-        trigger_creative = creative_trigger or pain_threshold > 0.55
+        trigger_creative = self._detect_creative_triggers(prompt, pain_threshold)
         
         # Création du résultat
         result = AnalysisResult(
@@ -394,7 +402,7 @@ class CriticalAnalyzer:
             emotional_depth=emotional_depth,
             feedback="",  # Sera généré
             suggested_temperature=0.7,  # Sera ajusté
-            trigger_creative=trigger_creative  # Nouveau
+            trigger_creative=trigger_creative  # NOUVEAU: détection élargie
         )
         
         # Génération du feedback et suggestion de température
