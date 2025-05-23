@@ -20,6 +20,7 @@ class MemoryEntry:
     emotion: str
     pain_score: float
     metadata: Dict[str, Any]
+    artifact: Optional[Dict[str, Any]] = None  # NOUVEAU: stockage d'artefact
     
     def to_dict(self) -> Dict[str, Any]:
         """Convertit l'entrée en dictionnaire"""
@@ -75,7 +76,8 @@ class EmotionalMemory:
         reward: float,
         emotion: str,
         pain_score: float,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        artifact: Optional[Dict[str, Any]] = None  # NOUVEAU: artefact
     ) -> None:
         """
         Stocke un nouveau souvenir
@@ -87,6 +89,7 @@ class EmotionalMemory:
             emotion: Tag émotionnel
             pain_score: Niveau de douleur
             metadata: Métadonnées additionnelles
+            artifact: Artefact créé (optionnel)
         """
         memory = MemoryEntry(
             timestamp=datetime.now().isoformat(),
@@ -95,7 +98,8 @@ class EmotionalMemory:
             reward=reward,
             emotion=emotion,
             pain_score=pain_score,
-            metadata=metadata or {}
+            metadata=metadata or {},
+            artifact=artifact  # NOUVEAU: stockage d'artefact
         )
         
         self.memories.append(memory)
@@ -228,7 +232,7 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
     
     def tail(self, n: int) -> List[MemoryEntry]:
         """
-        NOUVELLE MÉTHODE : Retourne les n derniers souvenirs
+        Retourne les n derniers souvenirs
         
         Args:
             n: Nombre de souvenirs à retourner
@@ -240,7 +244,7 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
     
     def summarize_memory(self, chunks: List[MemoryEntry]) -> str:
         """
-        NOUVELLE MÉTHODE : Résumé simple des souvenirs pour injection dans le prompt
+        Résumé simple des souvenirs pour injection dans le prompt
         
         Args:
             chunks: Liste des entrées mémoire à résumer
@@ -259,13 +263,18 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
             if len(response_words) == 50:
                 truncated += "..."
             
-            summaries.append(f"[{chunk.emotion}] {truncated}")
+            # Ajouter une mention de l'artefact s'il existe
+            artifact_note = ""
+            if chunk.artifact and chunk.artifact.get("type"):
+                artifact_note = f" + {chunk.artifact['type']} artifact"
+            
+            summaries.append(f"[{chunk.emotion}{artifact_note}] {truncated}")
         
         return " | ".join(summaries)
     
     def get_recent_responses_for_analysis(self, count: int = 5) -> List[str]:
         """
-        NOUVELLE MÉTHODE : Retourne les réponses récentes pour l'analyzer
+        Retourne les réponses récentes pour l'analyzer
         
         Args:
             count: Nombre de réponses à retourner
@@ -275,6 +284,32 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
         """
         recent = self.tail(count)
         return [memory.response for memory in recent]
+    
+    def get_artifacts(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        NOUVEAU: Récupère les artefacts récemment créés
+        
+        Args:
+            limit: Nombre maximum d'artefacts
+            
+        Returns:
+            Liste des artefacts récents
+        """
+        artifacts = []
+        for memory in reversed(self.memories):
+            if memory.artifact and isinstance(memory.artifact, dict):
+                artifacts.append({
+                    "timestamp": memory.timestamp,
+                    "type": memory.artifact.get("type", "unknown"),
+                    "content": memory.artifact.get("content", ""),
+                    "path": memory.artifact.get("path", ""),
+                    "prompt": memory.prompt
+                })
+                
+                if len(artifacts) >= limit:
+                    break
+        
+        return artifacts
 
 
 # Tests

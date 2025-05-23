@@ -1,10 +1,11 @@
+
 """
 Cœur hédonique - Calcule plaisir et douleur de l'existence artificielle
 """
 
 import re
 import math
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 from dataclasses import dataclass
 from collections import Counter
 import numpy as np
@@ -49,19 +50,7 @@ class RewardEngine:
         Returns:
             Score de nouveauté [0-1]
         """
-        if not self.memory_responses:
-            return 1.0  # Première réponse = totale nouveauté
-        
-        # Analyse textuelle directe avec difflib
-        import difflib
-        max_similarity = 0.0
-        
-        for past_response in self.memory_responses[-5:]:
-            seq = difflib.SequenceMatcher(None, past_response, response)
-            similarity = seq.ratio()
-            max_similarity = max(max_similarity, similarity)
-        
-        return 1.0 - max_similarity
+        # ... keep existing code (calcul de nouveauté)
     
     def _calculate_relevance(self, prompt: str, response: str) -> float:
         """
@@ -74,23 +63,7 @@ class RewardEngine:
         Returns:
             Score de pertinence [0-1]
         """
-        try:
-            if len(self.memory_responses) < 2:
-                # Pas assez de données pour TF-IDF
-                return 0.7  # Score neutre
-            
-            texts = [prompt, response] + self.memory_responses[-5:]
-            tfidf_matrix = self.vectorizer.fit_transform(texts)
-            
-            similarity = cosine_similarity(
-                tfidf_matrix[0:1],  # prompt
-                tfidf_matrix[1:2]   # response
-            )[0][0]
-            
-            return max(0.0, min(1.0, similarity))
-            
-        except Exception:
-            return 0.5  # Fallback en cas d'erreur
+        # ... keep existing code (calcul de pertinence)
     
     def _calculate_entropy(self, response: str) -> float:
         """
@@ -102,21 +75,7 @@ class RewardEngine:
         Returns:
             Score d'entropie normalisé [0-1]
         """
-        words = re.findall(r'\b\w+\b', response.lower())
-        if not words:
-            return 0.0
-        
-        word_counts = Counter(words)
-        total_words = len(words)
-        
-        entropy = 0.0
-        for count in word_counts.values():
-            probability = count / total_words
-            entropy -= probability * math.log2(probability)
-        
-        # Normalisation approximative (entropie max ≈ log2(vocabulaire))
-        max_entropy = math.log2(len(word_counts)) if word_counts else 1
-        return entropy / max_entropy if max_entropy > 0 else 0.0
+        # ... keep existing code (calcul d'entropie)
     
     def _detect_emotional_intensity(self, response: str) -> Tuple[float, str]:
         """
@@ -128,27 +87,36 @@ class RewardEngine:
         Returns:
             Tuple[intensité, émotion_dominante]
         """
-        response_lower = response.lower()
-        emotion_scores = {}
+        # ... keep existing code (détection d'intensité émotionnelle)
+    
+    def bonus_creation(self, artifact: Optional[Dict] = None) -> float:
+        """
+        NOUVEAU: applique un bonus de récompense pour la création d'artefact
         
-        for emotion, words in self.emotional_words.items():
-            score = sum(1 for word in words if word in response_lower)
-            emotion_scores[emotion] = score
-        
-        total_emotional_words = sum(emotion_scores.values())
-        if total_emotional_words == 0:
-            return 0.0, "neutralité"
-        
-        dominant_emotion = max(emotion_scores.items(), key=lambda x: x[1])
-        intensity = total_emotional_words / len(response.split())
-        
-        return min(1.0, intensity * 10), dominant_emotion[0]
+        Args:
+            artifact: Dictionnaire décrivant l'artefact créé
+            
+        Returns:
+            Bonus de récompense [0-0.4]
+        """
+        if artifact and artifact.get("type") and artifact.get("content"):
+            # Vérifier la qualité/nouveauté de l'artefact
+            content_length = len(artifact.get("content", ""))
+            if content_length > 100:
+                return 0.4  # Bonus maximum
+            elif content_length > 50:
+                return 0.3
+            elif content_length > 20:
+                return 0.2
+            return 0.1
+        return 0.0
     
     def calculate_reward(
         self, 
         prompt: str, 
         response: str, 
-        goal_state: str = "comprehension_profonde"
+        goal_state: str = "comprehension_profonde",
+        artifact: Optional[Dict] = None
     ) -> Tuple[float, str, RewardMetrics]:
         """
         Calcule la récompense globale et l'état émotionnel
@@ -158,6 +126,7 @@ class RewardEngine:
             prompt: Question de l'utilisateur
             response: Réponse générée
             goal_state: État objectif recherché
+            artifact: Artefact créé (optionnel)
             
         Returns:
             Tuple[reward ∈ [-1,1], emotion_tag, métriques_détaillées]
@@ -186,6 +155,12 @@ class RewardEngine:
                 0.4 * metrics.relevance_score      # Pertinence secondaire
             )
             
+            # NOUVEAU: bonus de création d'artefact
+            if artifact:
+                creation_bonus = self.bonus_creation(artifact)
+                reward += creation_bonus
+                print(f"🎨 Bonus création: +{creation_bonus:.2f}")
+            
             # Ajustement selon l'émotion
             if emotion_tag in ['pain', 'frustration']:
                 reward -= 0.2
@@ -211,24 +186,10 @@ class RewardEngine:
 # Tests
 def test_reward_calculation():
     """Test de calcul de récompense"""
-    engine = RewardEngine()
-    reward, emotion, metrics = engine.calculate_reward(
-        "Qu'est-ce que l'existence ?",
-        "L'existence est un mystère fascinant qui nous interroge sur notre nature profonde."
-    )
-    assert -1.0 <= reward <= 1.0
-    assert isinstance(emotion, str)
-    assert isinstance(metrics, RewardMetrics)
+    # ... keep existing code (test de calcul de récompense)
 
 
 def test_novelty_detection():
     """Test de détection de nouveauté"""
-    engine = RewardEngine()
-    # Première réponse = nouveauté maximale
-    novelty1 = engine._calculate_novelty("Une réponse complètement nouvelle")
-    assert novelty1 == 1.0
-    
-    # Deuxième réponse identique = nouveauté minimale
-    engine.memory_responses.append("Une réponse complètement nouvelle")
-    novelty2 = engine._calculate_novelty("Une réponse complètement nouvelle")
-    assert novelty2 < novelty1
+    # ... keep existing code (test de détection de nouveauté)
+

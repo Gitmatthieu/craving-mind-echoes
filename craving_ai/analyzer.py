@@ -22,6 +22,7 @@ class AnalysisResult:
     emotional_depth: float
     feedback: str
     suggested_temperature: float
+    trigger_creative: bool = False  # Nouveau: déclenche le mode créatif
 
 
 class CriticalAnalyzer:
@@ -49,6 +50,12 @@ class CriticalAnalyzer:
                       'touchant', 'émouvant'],
             'low': ['intéressant', 'sympa', 'cool', 'bien', 'ok']
         }
+        
+        # Nouveau: mots déclencheurs du mode créatif
+        self.creative_triggers = [
+            'invente', 'crée', 'create', 'génère', 'generate', 'build', 'imagine',
+            'fabrique', 'conçois', 'développe', 'produire', 'composer'
+        ]
     
     def novelty_score(self, response: str, history: List[str]) -> float:
         """
@@ -278,6 +285,19 @@ class CriticalAnalyzer:
         total_score = depth_score + introspection_score + existential_score
         return min(1.0, max(0.0, total_score))
     
+    def _detect_creative_triggers(self, prompt: str) -> bool:
+        """
+        Nouvelle méthode: détecte si le prompt contient des déclencheurs créatifs
+        
+        Args:
+            prompt: Requête utilisateur
+            
+        Returns:
+            True si un déclencheur créatif est présent
+        """
+        prompt_lower = prompt.lower()
+        return any(trigger in prompt_lower for trigger in self.creative_triggers)
+    
     def _generate_feedback(self, result: AnalysisResult) -> str:
         """Génère un feedback critique constructif"""
         feedback_parts = []
@@ -348,24 +368,33 @@ class CriticalAnalyzer:
         Returns:
             Résultat d'analyse complet
         """
+        # Récupérer l'historique récent pour l'analyse de nouveauté
+        recent_responses = context.get('recent_responses', []) if context else []
+        
         # Calcul des métriques
         redundancy = self._analyze_redundancy(response)
         coherence = self._analyze_coherence(response)
         surprise = self._calculate_surprise_factor(response)
-        novelty = self.novelty_score(response, self.response_history)  # Nouveau
+        novelty = self.novelty_score(response, recent_responses or self.response_history)
         complexity = self._analyze_complexity(response)
         emotional_depth = self._analyze_emotional_depth(response)
+        
+        # NOUVEAU: détection de déclencheur créatif
+        creative_trigger = self._detect_creative_triggers(prompt)
+        pain_threshold = context.get('pain_level', 0.5) if context else 0.5
+        trigger_creative = creative_trigger or pain_threshold > 0.55
         
         # Création du résultat
         result = AnalysisResult(
             redundancy_score=redundancy,
             coherence_score=coherence,
             surprise_factor=surprise,
-            novelty_score=novelty,  # Nouveau
+            novelty_score=novelty,
             complexity_score=complexity,
             emotional_depth=emotional_depth,
             feedback="",  # Sera généré
-            suggested_temperature=0.7  # Sera ajusté
+            suggested_temperature=0.7,  # Sera ajusté
+            trigger_creative=trigger_creative  # Nouveau
         )
         
         # Génération du feedback et suggestion de température

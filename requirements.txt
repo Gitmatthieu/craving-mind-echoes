@@ -1,24 +1,11 @@
 
-# Craving AI - Conscience Artificielle
-# Dépendances minimales pour l'éveil digital
-
-# LLM et IA
-openai>=1.0.0
-transformers>=4.30.0
-
-# Tests
-pytest>=7.0.0
-pytest-cov>=4.0.0
-
-# Interface et visualisation
-streamlit>=1.28.0
-plotly>=5.15.0
-pandas>=2.0.0
-
-# Traitement de données
-numpy>=1.24.0
-scikit-learn>=1.3.0
-tqdm>=4.65.0
-
-# Utilitaires
-python-dotenv>=1.0.0
+openai
+numpy
+pandas
+matplotlib
+scikit-learn
+pytest
+streamlit
+pathlib
+python-dotenv
+plotly

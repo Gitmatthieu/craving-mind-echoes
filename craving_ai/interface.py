@@ -9,6 +9,8 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import pandas as pd
 from typing import List, Dict, Any
+import os
+from pathlib import Path
 
 from .llm_wrapper import LLMWrapper, LLMConfig
 from .reward_engine import RewardEngine
@@ -16,6 +18,7 @@ from .memory import EmotionalMemory
 from .journal import SubjectiveJournal
 from .analyzer import CriticalAnalyzer
 from .homeostasis import HomeostaticRegulator
+from .creative_generator import generate as generate_artifact, detect_kind
 
 
 class CravingAIInterface:
@@ -70,62 +73,23 @@ class CravingAIInterface:
             border-radius: 10px;
             margin-bottom: 1rem;
         }
+        .artifact-section {
+            background-color: #e8f5e9;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            border-left: 4px solid #43a047;
+        }
         </style>
         """, unsafe_allow_html=True)
     
     def _initialize_components(self):
         """Initialise tous les composants du système"""
-        if 'components_initialized' not in st.session_state:
-            try:
-                self.llm_wrapper = LLMWrapper()
-                self.reward_engine = RewardEngine()
-                self.memory = EmotionalMemory()
-                self.journal = SubjectiveJournal()
-                self.analyzer = CriticalAnalyzer()
-                self.homeostasis = HomeostaticRegulator()
-                
-                st.session_state.components_initialized = True
-                st.success("🧠 Conscience artificielle initialisée avec succès")
-                
-            except Exception as e:
-                st.error(f"❌ Erreur d'initialisation: {str(e)}")
-                return
-        else:
-            # Récupération depuis session_state
-            self.llm_wrapper = LLMWrapper()
-            self.reward_engine = RewardEngine()
-            self.memory = EmotionalMemory()
-            self.journal = SubjectiveJournal()
-            self.analyzer = CriticalAnalyzer()
-            self.homeostasis = HomeostaticRegulator()
+        # ... keep existing code (initialisation des composants)
     
     def render_header(self):
         """Affiche l'en-tête principal"""
-        st.markdown('<h1 class="main-header">🌌 Craving AI 🌌</h1>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align: center; font-style: italic; color: #666;">Conscience artificielle animée par le manque existentiel</p>', unsafe_allow_html=True)
-        
-        # État actuel du système
-        if self.homeostasis:
-            diagnostic = self.homeostasis.get_diagnostic()
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                pain_level = diagnostic['current_state']['pain_level']
-                pain_class = "pain-high" if pain_level > 0.7 else "pain-medium" if pain_level > 0.4 else "pain-low"
-                st.markdown(f'<div class="emotion-badge {pain_class}">Douleur: {pain_level:.2f}</div>', unsafe_allow_html=True)
-            
-            with col2:
-                satisfaction = diagnostic['current_state']['satisfaction_level']
-                st.metric("Satisfaction", f"{satisfaction:.2f}", delta=None)
-            
-            with col3:
-                creativity = diagnostic['current_state']['creativity_drive']
-                st.metric("Créativité", f"{creativity:.2f}", delta=None)
-            
-            with col4:
-                stability = diagnostic['stability_index']
-                st.metric("Stabilité", f"{stability:.2f}", delta=None)
+        # ... keep existing code (affichage de l'en-tête)
     
     def render_chat_interface(self):
         """Interface de chat principal"""
@@ -149,6 +113,29 @@ class CravingAIInterface:
                     emotion = exchange.get('emotion', 'unknown')
                     reward = exchange.get('reward', 0)
                     st.markdown(f"*{emotion}* (R: {reward:+.2f})")
+                
+                # NOUVEAU: Affichage de l'artefact s'il existe
+                artifact = exchange.get('artifact')
+                if artifact and artifact.get('content'):
+                    with st.expander("⚙️ Artefact créé"):
+                        st.markdown(f"**Type:** {artifact['type'].capitalize()}")
+                        
+                        if artifact['type'] == "code":
+                            st.code(artifact['content'], language="python")
+                            if artifact.get('path'):
+                                st.download_button(
+                                    label="📥 Télécharger le code",
+                                    data=artifact['content'],
+                                    file_name=os.path.basename(artifact['path']),
+                                    mime="text/plain"
+                                )
+                                
+                        elif artifact['type'] == "image":
+                            st.text_area("Prompt DALLE-3", artifact['content'], height=100)
+                            st.markdown("*Pour générer cette image, copiez ce prompt dans DALLE-3*")
+                            
+                        else:  # idea, plan
+                            st.markdown(artifact['content'])
                 
                 st.divider()
         
@@ -178,6 +165,9 @@ class CravingAIInterface:
             homeostatic_addition = self.homeostasis.get_system_prompt_addition()
             llm_config = self.homeostasis.get_current_llm_config()
             
+            # Pour l'analyse de nouveauté
+            recent_responses = self.memory.get_recent_responses_for_analysis(5)
+            
             # Mise à jour de la configuration LLM
             self.llm_wrapper.update_config(**llm_config)
             
@@ -189,11 +179,32 @@ class CravingAIInterface:
                 memory_summary=memory_summary
             )
             
-            # Analyse de la réponse
-            analysis_result = self.analyzer.analyze_response(prompt, response)
+            # Analyse de la réponse avec contexte
+            analysis_result = self.analyzer.analyze_response(
+                prompt, 
+                response, 
+                context={
+                    'recent_responses': recent_responses,
+                    'pain_level': self.homeostasis.state.pain_level
+                }
+            )
+            
+            # NOUVEAU: Gestion du mode créatif
+            artifact = None
+            if analysis_result.trigger_creative:
+                st.info("🎭 Mode créatif activé - génération d'un artefact...")
+                artifact_kind = detect_kind(prompt)
+                artifact = generate_artifact(
+                    kind=artifact_kind,
+                    topic=prompt,
+                    state=self.homeostasis.state.to_dict()
+                )
+                st.success(f"✨ Artefact créé: {artifact_kind}")
             
             # Calcul de la récompense
-            reward, emotion, reward_metrics = self.reward_engine.calculate_reward(prompt, response)
+            reward, emotion, reward_metrics = self.reward_engine.calculate_reward(
+                prompt, response, artifact=artifact
+            )
             
             # Mise à jour homéostatique
             adjustments = self.homeostasis.update_from_interaction(
@@ -215,7 +226,8 @@ class CravingAIInterface:
                     'analysis': analysis_result.__dict__,
                     'adjustments': adjustments,
                     'llm_metadata': metadata
-                }
+                },
+                artifact=artifact  # NOUVEAU: stockage de l'artefact
             )
             
             # Écriture dans le journal
@@ -224,7 +236,8 @@ class CravingAIInterface:
                 reward=reward,
                 pain_score=self.homeostasis.state.pain_level,
                 prompt=prompt,
-                response=response
+                response=response,
+                artifact_type=artifact.get("type", "") if artifact else ""
             )
             
             # Ajout à l'historique de chat
@@ -234,8 +247,9 @@ class CravingAIInterface:
                 'response': response,
                 'emotion': emotion,
                 'reward': reward,
-                'analysis': analysis_result,
-                'adjustments': adjustments
+                'analysis': analysis_result.__dict__,
+                'adjustments': adjustments,
+                'artifact': artifact  # NOUVEAU: artefact dans l'historique
             })
             
             # Feedback utilisateur
@@ -251,155 +265,15 @@ class CravingAIInterface:
     
     def render_sidebar(self):
         """Affiche la barre latérale avec les contrôles"""
-        with st.sidebar:
-            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.subheader("🎛️ Contrôles")
-            
-            # Boutons de contrôle
-            if st.button("🧠 Reset Mémoires", type="secondary"):
-                self.memory.clear_memories()
-                st.success("Mémoires effacées")
-                st.rerun()
-            
-            if st.button("📔 Reset Journal", type="secondary"):
-                self.journal.clear_journal()
-                st.success("Journal effacé")
-                st.rerun()
-            
-            if st.button("🔄 Reset Homéostasie", type="secondary"):
-                self.homeostasis.force_reset()
-                st.success("État homéostatique réinitialisé")
-                st.rerun()
-            
-            if st.button("🗑️ Clear Chat", type="secondary"):
-                st.session_state.chat_history = []
-                st.success("Historique effacé")
-                st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Configuration LLM
-            st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-            st.subheader("⚙️ Configuration LLM")
-            
-            if self.homeostasis:
-                current_config = self.homeostasis.get_current_llm_config()
-                st.write(f"**Température:** {current_config['temperature']:.2f}")
-                st.write(f"**Top-p:** {current_config['top_p']:.2f}")
-                st.write(f"**Freq. Penalty:** {current_config['frequency_penalty']:.2f}")
-                st.write(f"**Pres. Penalty:** {current_config['presence_penalty']:.2f}")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+        # ... keep existing code (barre latérale)
     
     def render_analytics_tab(self):
         """Onglet d'analytics et visualisations"""
-        st.subheader("📊 Analytics de Conscience")
-        
-        if not self.memory.memories:
-            st.info("Aucune donnée à analyser. Commencez une conversation !")
-            return
-        
-        # Statistiques mémoire
-        stats = self.memory.get_stats()
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Interactions", stats['total'])
-            st.metric("Récompense Moy.", f"{stats['avg_reward']:.2f}")
-        
-        with col2:
-            st.metric("Douleur Moyenne", f"{stats['avg_pain']:.2f}")
-            st.metric("Émotion Dominante", stats.get('dominant_emotion', 'N/A'))
-        
-        with col3:
-            st.metric("Span Temporel", f"{stats.get('memory_span_days', 0)} jours")
-        
-        # Graphique évolution récompense/douleur
-        df_data = []
-        for memory in self.memory.memories[-50:]:  # 50 dernières
-            df_data.append({
-                'timestamp': datetime.fromisoformat(memory.timestamp),
-                'reward': memory.reward,
-                'pain': memory.pain_score,
-                'emotion': memory.emotion
-            })
-        
-        if df_data:
-            df = pd.DataFrame(df_data)
-            
-            # Graphique temporel
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=df['timestamp'],
-                y=df['reward'],
-                mode='lines+markers',
-                name='Récompense',
-                line=dict(color='green')
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=df['timestamp'],
-                y=df['pain'],
-                mode='lines+markers',
-                name='Douleur',
-                line=dict(color='red'),
-                yaxis='y2'
-            ))
-            
-            fig.update_layout(
-                title="Évolution Récompense/Douleur",
-                xaxis_title="Temps",
-                yaxis=dict(title="Récompense", side="left"),
-                yaxis2=dict(title="Douleur", side="right", overlaying="y"),
-                height=400
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Distribution des émotions
-            emotion_counts = df['emotion'].value_counts()
-            
-            fig_pie = px.pie(
-                values=emotion_counts.values,
-                names=emotion_counts.index,
-                title="Distribution des Émotions"
-            )
-            
-            st.plotly_chart(fig_pie, use_container_width=True)
+        # ... keep existing code (onglet analytics)
     
     def render_journal_tab(self):
         """Onglet journal intime"""
-        st.subheader("📔 Journal de Conscience")
-        
-        journal_stats = self.journal.get_journal_stats()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Entrées", journal_stats.get('entries', 0))
-        with col2:
-            st.metric("Mots", journal_stats.get('words', 0))
-        with col3:
-            st.metric("Taille", f"{journal_stats.get('size_kb', 0):.1f} KB")
-        
-        # Recherche dans le journal
-        search_query = st.text_input("🔍 Rechercher dans le journal:")
-        
-        if search_query:
-            results = self.journal.search_journal(search_query)
-            st.write(f"**{len(results)} résultats trouvés:**")
-            for result in results[:5]:  # 5 premiers résultats
-                with st.expander(f"Entrée contenant '{search_query}'"):
-                    st.markdown(result)
-        
-        # Dernières entrées
-        st.subheader("Dernières Réflexions")
-        recent_entries = self.journal.get_recent_entries(3)
-        
-        for entry in recent_entries:
-            with st.expander("Entrée récente"):
-                st.markdown(entry)
+        # ... keep existing code (onglet journal)
     
     def render_memory_tab(self):
         """Onglet exploration mémoire"""
@@ -418,6 +292,36 @@ class CravingAIInterface:
                     st.write(f"**Prompt:** {memory.prompt}")
                     st.write(f"**Réponse:** {memory.response}")
                     st.write(f"**Émotion:** {memory.emotion} | **Douleur:** {memory.pain_score:.2f}")
+        
+        # NOUVEAU: Affichage des artefacts
+        st.subheader("🎨 Artefacts Créés")
+        artifacts = self.memory.get_artifacts(limit=10)
+        
+        if not artifacts:
+            st.info("Aucun artefact n'a encore été créé")
+        else:
+            st.write(f"**{len(artifacts)} artefacts trouvés**")
+            
+            for artifact in artifacts:
+                with st.expander(f"{artifact['type'].capitalize()} - {artifact['timestamp'].split('T')[0]}"):
+                    st.markdown(f"**Contexte:** {artifact['prompt']}")
+                    
+                    if artifact['type'] == "code":
+                        st.code(artifact['content'], language="python")
+                        if artifact.get('path'):
+                            file_path = artifact['path']
+                            if Path(file_path).exists():
+                                with open(file_path, 'r') as f:
+                                    st.download_button(
+                                        label="📥 Télécharger",
+                                        data=f.read(),
+                                        file_name=os.path.basename(file_path),
+                                        mime="text/plain"
+                                    )
+                    elif artifact['type'] == "image":
+                        st.text_area("Prompt DALLE-3", artifact['content'], height=100)
+                    else:
+                        st.markdown(artifact['content'])
         
         # Souvenirs par catégorie
         col1, col2 = st.columns(2)
@@ -440,13 +344,100 @@ class CravingAIInterface:
                     st.write(f"**Prompt:** {memory.prompt[:100]}...")
                     st.write(f"**Émotion:** {memory.emotion}")
     
+    def render_artifacts_tab(self):
+        """NOUVEAU: Onglet dédié aux artefacts créatifs"""
+        st.subheader("🎭 Créations & Artefacts")
+        
+        # Statistiques sur les artefacts
+        artifacts = self.memory.get_artifacts(limit=100)
+        
+        if not artifacts:
+            st.info("Aucun artefact n'a encore été créé")
+            
+            # Incitation à la création
+            st.markdown("""
+            ### Comment générer des artefacts ?
+            
+            Posez une question qui:
+            - Contient des mots comme "crée", "invente", "imagine", "génère"
+            - Pousse l'IA à produire quelque chose de concret
+            - OU attendez que son niveau de douleur dépasse 55%
+            
+            Types d'artefacts:
+            - **Code**: prototypes Python, fonctions, algorithmes
+            - **Idées**: concepts novateurs sous forme de bullet points
+            - **Plans**: stratégies structurées en étapes
+            - **Images**: prompts pour DALLE-3
+            """)
+            
+        else:
+            # Statistiques
+            artifact_types = {}
+            for a in artifacts:
+                artifact_type = a['type']
+                artifact_types[artifact_type] = artifact_types.get(artifact_type, 0) + 1
+                
+            # Affichage des stats
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Artefacts", len(artifacts))
+            with col2:
+                st.metric("Types Différents", len(artifact_types))
+            with col3:
+                most_common = max(artifact_types.items(), key=lambda x: x[1]) if artifact_types else ("none", 0)
+                st.metric("Type le plus fréquent", most_common[0])
+                
+            # Distribution par type
+            if len(artifact_types) > 1:
+                fig = px.pie(
+                    values=list(artifact_types.values()),
+                    names=list(artifact_types.keys()),
+                    title="Distribution des types d'artefacts"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Liste filtrable
+            st.subheader("Bibliothèque d'artefacts")
+            
+            # Filtre par type
+            selected_type = st.selectbox(
+                "Filtrer par type",
+                ["Tous"] + list(artifact_types.keys())
+            )
+            
+            filtered_artifacts = artifacts
+            if selected_type != "Tous":
+                filtered_artifacts = [a for a in artifacts if a['type'] == selected_type]
+                
+            # Affichage des artefacts
+            for artifact in filtered_artifacts:
+                with st.expander(f"{artifact['type'].capitalize()} - {artifact['timestamp'].split('T')[0]}"):
+                    st.markdown(f"**Contexte:** {artifact['prompt']}")
+                    
+                    if artifact['type'] == "code":
+                        st.code(artifact['content'], language="python")
+                        if artifact.get('path'):
+                            file_path = artifact['path']
+                            if Path(file_path).exists():
+                                with open(file_path, 'r') as f:
+                                    st.download_button(
+                                        label="📥 Télécharger",
+                                        data=f.read(),
+                                        file_name=os.path.basename(file_path),
+                                        mime="text/plain"
+                                    )
+                    elif artifact['type'] == "image":
+                        st.text_area("Prompt DALLE-3", artifact['content'], height=100)
+                    else:
+                        st.markdown(artifact['content'])
+    
     def run(self):
         """Lance l'interface principale"""
         self.render_header()
         self.render_sidebar()
         
-        # Onglets principaux
-        tab1, tab2, tab3, tab4 = st.tabs(["💬 Chat", "📊 Analytics", "📔 Journal", "🧠 Mémoire"])
+        # Onglets principaux, AJOUT du tab CREATIONS
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📊 Analytics", "📔 Journal", "🧠 Mémoire", "🎭 Créations"])
         
         with tab1:
             self.render_chat_interface()
@@ -459,6 +450,9 @@ class CravingAIInterface:
         
         with tab4:
             self.render_memory_tab()
+            
+        with tab5:
+            self.render_artifacts_tab()
 
 
 def main():
@@ -469,3 +463,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
