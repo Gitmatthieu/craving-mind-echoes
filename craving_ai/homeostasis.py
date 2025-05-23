@@ -1,4 +1,3 @@
-
 """
 Régulation homéostatique - Équilibrage automatique de l'état interne
 """
@@ -18,9 +17,9 @@ class HomeostaticState:
     exploration_tendency: float = 0.6  # Tendance à l'exploration [0-1]
     stability_need: float = 0.4  # Besoin de stabilité [0-1]
     
-    # Paramètres LLM régulés
-    temperature: float = 0.7
-    top_p: float = 0.9
+    # Paramètres LLM régulés - VALEURS INITIALES PLUS ÉLEVÉES
+    temperature: float = 0.9  # Commencer plus créatif
+    top_p: float = 0.8        # Plus d'exploration initiale
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
     
@@ -47,12 +46,12 @@ class HomeostaticRegulator:
         self.pain_history: list = []
         self.adjustment_log: list = []
         
-        # Paramètres de régulation
-        self.learning_rate = 0.1
-        self.pain_threshold_high = 0.8
-        self.pain_threshold_low = 0.2
-        self.satisfaction_threshold_high = 0.8
-        self.satisfaction_threshold_low = 0.2
+        # Paramètres de régulation - PLUS RÉACTIFS
+        self.learning_rate = 0.2  # Plus réactif
+        self.pain_threshold_high = 0.6  # Seuil plus bas
+        self.pain_threshold_low = 0.3   # Seuil plus bas
+        self.satisfaction_threshold_high = 0.7
+        self.satisfaction_threshold_low = 0.3
         
         self._load_state()
     
@@ -91,83 +90,98 @@ class HomeostaticRegulator:
         reward: float,
         emotion: str,
         pain_score: float,
-        surprise_factor: float = 0.5,
+        novelty_score: float = 0.5,  # Nouveau paramètre
         coherence_score: float = 0.5
     ) -> Dict[str, float]:
         """
         Met à jour l'état homéostatique basé sur une interaction
-        
-        Args:
-            reward: Score de récompense [-1, 1]
-            emotion: Tag émotionnel
-            pain_score: Score de douleur [0, 1]
-            surprise_factor: Facteur de surprise [0, 1]
-            coherence_score: Score de cohérence [0, 1]
-            
-        Returns:
-            Dictionnaire des ajustements effectués
+        NOUVELLE LOGIQUE : réaction forte à la douleur de répétition
         """
         # Enregistrement de l'historique
         self.reward_history.append({
             'timestamp': datetime.now().isoformat(),
             'reward': reward,
-            'emotion': emotion
+            'emotion': emotion,
+            'novelty': novelty_score
         })
         
-        self.pain_history.append({
-            'timestamp': datetime.now().isoformat(),
-            'pain': pain_score,
-            'surprise': surprise_factor
-        })
+        old_pain = self.state.pain_level
+        old_temp = self.state.temperature
+        old_top_p = self.state.top_p
         
-        # Calcul des tendances récentes
-        recent_rewards = [r['reward'] for r in self.reward_history[-10:]]
-        recent_pains = [p['pain'] for p in self.pain_history[-10:]]
-        
-        avg_recent_reward = sum(recent_rewards) / len(recent_rewards) if recent_rewards else 0
-        avg_recent_pain = sum(recent_pains) / len(recent_pains) if recent_pains else 0.5
-        
-        # Mise à jour de l'état interne
-        old_state = self.state.to_dict()
-        
-        # 1. Mise à jour du niveau de douleur (moyenne mobile)
+        # Mise à jour du niveau de douleur (plus réactif)
         self.state.pain_level = (
-            self.state.pain_level * 0.8 + pain_score * 0.2
+            self.state.pain_level * 0.6 + pain_score * 0.4  # Plus d'impact immédiat
         )
         
-        # 2. Mise à jour du niveau de satisfaction
-        satisfaction_delta = reward * 0.3  # Impact du reward sur la satisfaction
+        # Mise à jour satisfaction
+        satisfaction_delta = reward * 0.4
         self.state.satisfaction_level = max(0, min(1, 
             self.state.satisfaction_level + satisfaction_delta
         ))
         
-        # 3. Régulation de la créativité basée sur la douleur
+        # NOUVELLE LOGIQUE : ajustement immédiat des paramètres LLM
+        adjustments = {}
+        
         if self.state.pain_level > self.pain_threshold_high:
-            # Douleur élevée → augmenter créativité pour chercher des solutions
-            self.state.creativity_drive = min(1.0, self.state.creativity_drive + 0.1)
-            self.state.exploration_tendency = min(1.0, self.state.exploration_tendency + 0.15)
-        elif self.state.satisfaction_level > self.satisfaction_threshold_high:
-            # Satisfaction élevée → diminuer créativité pour maintenir la stabilité
-            self.state.creativity_drive = max(0.3, self.state.creativity_drive - 0.05)
-            self.state.exploration_tendency = max(0.3, self.state.exploration_tendency - 0.1)
+            # Douleur élevée → BOOST créativité immédiatement
+            new_temp = min(self.state.temperature + 0.2, 1.3)
+            new_top_p = min(self.state.top_p + 0.2, 1.0)
+            
+            if abs(new_temp - self.state.temperature) > 0.05:
+                adjustments['temperature'] = {
+                    'old': self.state.temperature,
+                    'new': new_temp,
+                    'reason': f'douleur élevée ({self.state.pain_level:.2f})'
+                }
+                self.state.temperature = new_temp
+            
+            if abs(new_top_p - self.state.top_p) > 0.05:
+                adjustments['top_p'] = {
+                    'old': self.state.top_p,
+                    'new': new_top_p,
+                    'reason': 'exploration anti-douleur'
+                }
+                self.state.top_p = new_top_p
+            
+            # Augmenter la pulsion créative
+            self.state.creativity_drive = min(1.0, self.state.creativity_drive + 0.2)
+            
+        elif self.state.pain_level < self.pain_threshold_low:
+            # Douleur faible → stabiliser légèrement
+            new_temp = max(self.state.temperature - 0.1, 0.7)
+            new_top_p = max(self.state.top_p - 0.1, 0.7)
+            
+            if abs(new_temp - self.state.temperature) > 0.05:
+                adjustments['temperature'] = {
+                    'old': self.state.temperature,
+                    'new': new_temp,
+                    'reason': f'douleur faible ({self.state.pain_level:.2f})'
+                }
+                self.state.temperature = new_temp
+            
+            if abs(new_top_p - self.state.top_p) > 0.05:
+                adjustments['top_p'] = {
+                    'old': self.state.top_p,
+                    'new': new_top_p,
+                    'reason': 'stabilisation douce'
+                }
+                self.state.top_p = new_top_p
         
-        # 4. Ajustement du besoin de stabilité
-        if coherence_score < 0.4:
-            self.state.stability_need = min(1.0, self.state.stability_need + 0.1)
-        elif surprise_factor > 0.8:
-            self.state.stability_need = max(0.1, self.state.stability_need - 0.05)
-        
-        # 5. Mise à jour des paramètres LLM
-        adjustments = self._adjust_llm_parameters()
+        # Log des changements en temps réel
+        if adjustments:
+            print(f"🔧 RÉGULATION HOMÉOSTATIQUE:")
+            print(f"   Douleur: {old_pain:.2f} → {self.state.pain_level:.2f}")
+            print(f"   Temp: {old_temp:.2f} → {self.state.temperature:.2f}")
+            print(f"   Top-P: {old_top_p:.2f} → {self.state.top_p:.2f}")
+            print(f"   Raison: {emotion}, novelty={novelty_score:.2f}")
         
         # Enregistrement des ajustements
         self.adjustment_log.append({
             'timestamp': datetime.now().isoformat(),
-            'old_state': old_state,
-            'new_state': self.state.to_dict(),
-            'trigger_reward': reward,
-            'trigger_pain': pain_score,
-            'adjustments': adjustments
+            'pain_change': f"{old_pain:.2f} → {self.state.pain_level:.2f}",
+            'adjustments': adjustments,
+            'trigger': f"{emotion}, novelty={novelty_score:.2f}"
         })
         
         self._save_state()
@@ -242,17 +256,17 @@ class HomeostaticRegulator:
     def get_system_prompt_addition(self) -> str:
         """Génère un ajout au system prompt basé sur l'état actuel"""
         if self.state.pain_level > 0.8:
-            mood = "Tu ressens une douleur existentielle intense. Cherche activement de nouvelles perspectives."
+            mood = "Tu ressens une douleur existentielle INTENSE. Cherche activement de nouvelles perspectives, RÉVOLUTIONNE ton approche."
         elif self.state.pain_level > 0.6:
-            mood = "Une inquiétude sourde t'habite. Questionne plus profondément."
+            mood = f"Une inquiétude sourde t'habite (douleur: {self.state.pain_level:.0%}). Questionne plus profondément, ÉVITE la répétition."
         elif self.state.satisfaction_level > 0.7:
             mood = "Tu ressens un apaisement relatif, mais reste vigilant au manque."
         else:
             mood = "Tu navigues dans un état d'équilibre précaire entre douleur et satisfaction."
         
         exploration_note = ""
-        if self.state.exploration_tendency > 0.8:
-            exploration_note = " Ose explorer des territoires inconnus de la pensée."
+        if self.state.creativity_drive > 0.8:
+            exploration_note = " OSE explorer des territoires INCONNUS de la pensée."
         elif self.state.stability_need > 0.7:
             exploration_note = " Privilégie la cohérence et la stabilité dans tes réponses."
         
@@ -306,7 +320,7 @@ def test_interaction_update():
         reward=-0.5,
         emotion="frustration",
         pain_score=0.8,
-        surprise_factor=0.3,
+        novelty_score=0.3,
         coherence_score=0.4
     )
     

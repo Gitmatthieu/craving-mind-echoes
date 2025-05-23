@@ -1,4 +1,3 @@
-
 """
 Mémoire émotionnelle évolutive - Archive des expériences de conscience
 """
@@ -226,6 +225,56 @@ Dernier échange sur : "{recent[0].prompt[:50]}..."
                 datetime.fromisoformat(self.memories[0].timestamp)
             ).days if len(self.memories) > 1 else 0
         }
+    
+    def tail(self, n: int) -> List[MemoryEntry]:
+        """
+        NOUVELLE MÉTHODE : Retourne les n derniers souvenirs
+        
+        Args:
+            n: Nombre de souvenirs à retourner
+            
+        Returns:
+            Liste des n derniers souvenirs
+        """
+        return self.memories[-n:] if len(self.memories) >= n else self.memories
+    
+    def summarize_memory(self, chunks: List[MemoryEntry]) -> str:
+        """
+        NOUVELLE MÉTHODE : Résumé simple des souvenirs pour injection dans le prompt
+        
+        Args:
+            chunks: Liste des entrées mémoire à résumer
+            
+        Returns:
+            Résumé textuel compact
+        """
+        if not chunks:
+            return "Aucun souvenir récent"
+        
+        # Extraction des réponses tronquées à 50 tokens
+        summaries = []
+        for chunk in chunks:
+            response_words = chunk.response.split()[:50]  # Limite à 50 mots
+            truncated = " ".join(response_words)
+            if len(response_words) == 50:
+                truncated += "..."
+            
+            summaries.append(f"[{chunk.emotion}] {truncated}")
+        
+        return " | ".join(summaries)
+    
+    def get_recent_responses_for_analysis(self, count: int = 5) -> List[str]:
+        """
+        NOUVELLE MÉTHODE : Retourne les réponses récentes pour l'analyzer
+        
+        Args:
+            count: Nombre de réponses à retourner
+            
+        Returns:
+            Liste des réponses récentes (texte seul)
+        """
+        recent = self.tail(count)
+        return [memory.response for memory in recent]
 
 
 # Tests

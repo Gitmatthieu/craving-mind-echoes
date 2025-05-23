@@ -1,4 +1,3 @@
-
 """
 Cœur hédonique - Calcule plaisir et douleur de l'existence artificielle
 """
@@ -40,9 +39,9 @@ class RewardEngine:
             'wonder': ['émerveillement', 'stupéfaction', 'admiration']
         }
     
-    def _calculate_novelty(self, response: str) -> float:
+    def _calculate_novelty_strict(self, response: str) -> float:
         """
-        Calcule la nouveauté par analyse des n-grammes
+        Calcule la nouveauté avec détection stricte de répétition
         
         Args:
             response: Réponse à analyser
@@ -53,21 +52,16 @@ class RewardEngine:
         if not self.memory_responses:
             return 1.0  # Première réponse = totale nouveauté
         
-        # Extraction des trigrammes
-        words = re.findall(r'\b\w+\b', response.lower())
-        new_trigrams = set(zip(words, words[1:], words[2:]))
+        # Analyse textuelle directe avec difflib
+        import difflib
+        max_similarity = 0.0
         
-        # Trigrammes déjà vus
-        all_trigrams = set()
-        for past_response in self.memory_responses[-10:]:  # 10 dernières réponses
-            past_words = re.findall(r'\b\w+\b', past_response.lower())
-            all_trigrams.update(zip(past_words, past_words[1:], past_words[2:]))
+        for past_response in self.memory_responses[-5:]:
+            seq = difflib.SequenceMatcher(None, past_response, response)
+            similarity = seq.ratio()
+            max_similarity = max(max_similarity, similarity)
         
-        if not new_trigrams:
-            return 0.0
-        
-        novel_count = len(new_trigrams - all_trigrams)
-        return novel_count / len(new_trigrams)
+        return 1.0 - max_similarity
     
     def _calculate_relevance(self, prompt: str, response: str) -> float:
         """
@@ -158,6 +152,7 @@ class RewardEngine:
     ) -> Tuple[float, str, RewardMetrics]:
         """
         Calcule la récompense globale et l'état émotionnel
+        NOUVELLE FORMULE : privilégie la nouveauté pour éviter le bégaiement
         
         Args:
             prompt: Question de l'utilisateur
@@ -170,7 +165,7 @@ class RewardEngine:
         metrics = RewardMetrics()
         
         # Calcul des métriques individuelles
-        metrics.novelty_score = self._calculate_novelty(response)
+        metrics.novelty_score = self._calculate_novelty_strict(response)  # Nouvelle méthode
         metrics.relevance_score = self._calculate_relevance(prompt, response)
         metrics.entropy_score = self._calculate_entropy(response)
         metrics.emotional_intensity, emotion_tag = self._detect_emotional_intensity(response)
@@ -179,28 +174,36 @@ class RewardEngine:
         words = len(response.split())
         metrics.coherence_score = min(1.0, words / 100) if words > 10 else 0.3
         
-        # Formule de récompense pondérée
-        reward = (
-            0.3 * metrics.novelty_score +
-            0.3 * metrics.relevance_score +
-            0.2 * metrics.entropy_score +
-            0.1 * metrics.coherence_score +
-            0.1 * metrics.emotional_intensity
-        )
+        # NOUVELLE FORMULE : pénalise fortement la répétition
+        if metrics.novelty_score < 0.25:
+            # Répétition flagrante = douleur maximale
+            final_reward = -1.0
+            emotion_tag = "douleur"
+        else:
+            # Formule privilégiant la nouveauté
+            reward = (
+                0.6 * metrics.novelty_score +      # Nouveauté prioritaire
+                0.4 * metrics.relevance_score      # Pertinence secondaire
+            )
+            
+            # Ajustement selon l'émotion
+            if emotion_tag in ['pain', 'frustration']:
+                reward -= 0.2
+            elif emotion_tag in ['joy', 'wonder']:
+                reward += 0.1
+            
+            # Normalisation finale [-1, 1]
+            final_reward = max(-1.0, min(1.0, (reward * 2) - 1))
         
-        # Ajustement selon l'émotion
-        if emotion_tag in ['pain', 'frustration']:
-            reward -= 0.2  # La douleur diminue la récompense
-        elif emotion_tag in ['joy', 'wonder']:
-            reward += 0.1  # Le plaisir l'augmente légèrement
-        
-        # Normalisation finale [-1, 1]
-        final_reward = max(-1.0, min(1.0, (reward * 2) - 1))
+        # Calcul du niveau de douleur
+        pain_level = 1.0 - ((final_reward + 1.0) / 2.0)  # Inverse du reward normalisé
         
         # Stockage pour futures comparaisons
         self.memory_responses.append(response)
         if len(self.memory_responses) > 50:
             self.memory_responses = self.memory_responses[-25:]  # Pruning
+        
+        print(f"🧠 Reward: {final_reward:.2f}, Novelty: {metrics.novelty_score:.2f}, Pain: {pain_level:.2f}")
         
         return final_reward, emotion_tag, metrics
 

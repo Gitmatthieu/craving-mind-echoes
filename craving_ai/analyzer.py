@@ -1,10 +1,10 @@
-
 """
 Sur-moi critique - Évaluation et auto-analyse des réponses
 """
 
 import re
 import math
+import difflib
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from collections import Counter
@@ -17,6 +17,7 @@ class AnalysisResult:
     redundancy_score: float
     coherence_score: float
     surprise_factor: float
+    novelty_score: float  # Nouveau : détection de redite pure
     complexity_score: float
     emotional_depth: float
     feedback: str
@@ -48,6 +49,23 @@ class CriticalAnalyzer:
                       'touchant', 'émouvant'],
             'low': ['intéressant', 'sympa', 'cool', 'bien', 'ok']
         }
+    
+    def novelty_score(self, response: str, history: List[str]) -> float:
+        """
+        Renvoie un score ∈ [0,1] où 0 = 100% répété, 1 = entièrement nouveau.
+        Utilise difflib pour détecter la similarité textuelle directe.
+        """
+        if not history:
+            return 1.0
+        
+        # Compare avec les 3 dernières réponses
+        max_similarity = 0.0
+        for past_response in history[-3:]:
+            seq = difflib.SequenceMatcher(None, past_response, response)
+            similarity = seq.ratio()
+            max_similarity = max(max_similarity, similarity)
+        
+        return 1.0 - max_similarity
     
     def _analyze_redundancy(self, response: str) -> float:
         """
@@ -334,6 +352,7 @@ class CriticalAnalyzer:
         redundancy = self._analyze_redundancy(response)
         coherence = self._analyze_coherence(response)
         surprise = self._calculate_surprise_factor(response)
+        novelty = self.novelty_score(response, self.response_history)  # Nouveau
         complexity = self._analyze_complexity(response)
         emotional_depth = self._analyze_emotional_depth(response)
         
@@ -342,6 +361,7 @@ class CriticalAnalyzer:
             redundancy_score=redundancy,
             coherence_score=coherence,
             surprise_factor=surprise,
+            novelty_score=novelty,  # Nouveau
             complexity_score=complexity,
             emotional_depth=emotional_depth,
             feedback="",  # Sera généré
