@@ -156,7 +156,7 @@ class CravingAICore:
             )
             print(f"🔍 Analyse: {analysis_result.feedback}")
             
-            # 5. Calcul de récompense
+            # 5. Calcul de récompense avec retour de la douleur réelle
             reward, emotion, reward_metrics, true_pain = self.reward_engine.calculate_reward(prompt, response)
             print(f"🎯 Récompense: {reward:+.2f} | Émotion: {emotion} | Douleur réelle: {true_pain:.2f}")
             

@@ -40,8 +40,6 @@ class RewardEngine:
             'wonder': ['émerveillement', 'stupéfaction', 'admiration']
         }
     
-    # ... keep existing code (_calculate_novelty_strict, _calculate_relevance, _calculate_entropy, _detect_emotional_intensity methods)
-    
     def _calculate_novelty_strict(self, response: str) -> float:
         """
         Calcule la nouveauté avec détection stricte de répétition
@@ -230,8 +228,6 @@ class RewardEngine:
         
         return final_reward, emotion_tag, metrics, pain_level
 
-
-# ... keep existing code (test functions)
 
 def test_reward_calculation():
     """Test de calcul de récompense"""
